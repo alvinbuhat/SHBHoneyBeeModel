@@ -1,0 +1,1381 @@
+breed [ cells cell ]     ;; bee larva cells
+breed [ honeys honey ]   ;; honey
+breed [ beetles beetle ] ;; beetles
+breed [ bees bee ]
+breed [ larvae larva ]
+breed [ guards guard]    ;; guard bees
+
+cells-own [
+
+  hex-neighbors  ;; agentset of 6 neighboring cells
+  n              ;; used to store a count of white neighbors
+  cell-type      ;; ask maan for these three variables
+
+  cell-life      ;; life of larva
+
+]
+
+honeys-own [
+
+  hex-neighbors  ;; agentset of 6 neighboring cells
+  n              ;; used to store a count of white neighbors
+  honey-type      ;; ask maan for these three variables
+
+  honey-life
+
+]
+
+beetles-own [
+
+  beetle-life    ;; life of larva
+  target
+  nearest-bee
+  ;;attack
+]
+
+larvae-own [
+
+  larva-life
+  target
+]
+
+bees-own [
+
+  bee-life
+  neighbor
+  nearest-parasite
+
+]
+
+guards-own [
+  guard-life
+  nearest-parasite-guards
+]
+
+
+to setup
+  clear-all
+
+  ;;setup beetles
+  set-default-shape beetles "bug"
+  create-beetles initial-beetle-population
+  [
+    ;;set attack 0
+    set size 1         ;;
+    set color green      ;;
+    set beetle-life 1  ;;
+    move-to one-of patches with [(pxcor > -3 and pxcor < 3  and pycor > 0 and pycor < 2 and pzcor = 1)
+    ;or (pxcor > -3 and pxcor < 3  and pycor = 0 and pzcor = 6)
+    ]
+       ; setxyz random-between (-3) (3) 0 random-between (-6) (5);; randomize bettle position along the bottom edge
+  ]
+
+  ;;setup bees
+  set-default-shape bees "bee"
+  create-bees initial-bee-population
+  [ set size 2         ;;
+    set color pink      ;;
+    set bee-life 20  ;;
+    move-to one-of patches with [(pxcor < max-pxcor and pycor > 5 and pzcor = 0)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 4)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 8)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 12)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 16)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 20)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 24)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 28)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 32)
+    or (pxcor < max-pxcor and pycor > 5 and pzcor = 36)
+    ]
+    ;setxyz random-xcor random-between (5) (40) 0  ;; randomize bee position along the bottom edge
+   ; setxyz random-xcor random-ycor random-zcor ;random anywhere
+  ]
+
+  ;;setup guards
+  set-default-shape guards "bee"
+  create-guards initial-guard-population
+  [ set size 2         ;;
+    set color blue     ;;
+    set guard-life 20  ;;
+    move-to one-of patches with [(pxcor < max-pxcor and pycor < 2.1 and pzcor = 0)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 4)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 8)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 12)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 16)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 20)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 24)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 28)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 32)
+    or (pxcor < max-pxcor and pycor < 2.1 and pzcor = 36)
+    ]
+;    setxy random-xcor 0  ;; randomize guard position along the bottom edge
+  ]
+
+  set-default-shape larvae "caterpillar"
+  ;create-larvae initial-larva-population
+  ;[ set size 1
+  ;  set color pink
+  ;  set larva-life 1
+  ;]
+
+  ;setup cells
+  setup-hex-grid
+
+  reset-ticks
+end ;;of to setup
+
+
+to go
+
+  ;stopping criteria
+  if count bees with [ bee-life > 0 ] < .10 * initial-bee-population [stop]
+  if count cells with [ cell-life > 0] < 4400 [stop]
+  if count cells with [ color = yellow] > 13200 [stop]
+  ;turtle commands
+  ask beetles
+  [
+    ;if who >= ticks [ stop ] ;; delay initial departure
+    set color green
+    ;wiggle
+    ;fd 0.2
+    move-to-food
+    reduce-beetle-life
+    let target-patch min-one-of (patches in-radius 10 with [pcolor = black or pcolor = orange]) [distance myself]
+    if pcolor = red [
+      move-to target-patch
+      ifelse pxcor >= 0
+      [rt random 90]
+      [lt random 90]
+    ]
+    if beetle-life = 21 [
+      set beetle-life 1
+      hatch-larvae random 2 [
+      ;;30 - 10 [
+        set larva-life 1
+        wiggle
+      ]
+    ]
+    if beetle-life = 0 [ die ]
+    evade-bee
+    bounce-beetles
+    if ((pxcor = 45 or pxcor = -45) and pycor <= 5) [ uphill pycor ]
+  ]
+
+  ask larvae
+  [
+    set color yellow
+    ;wiggle
+    ;fd 0.02
+    move-to-food
+    reduce-larva-life
+    if larva-life = 0 [ die ]
+  ]
+
+  ask bees
+  [
+    ;let blacklist patches with [ pcolor = red ]
+    let target-patch min-one-of (patches in-radius 10 with [pycor >= 6 and pxcor != 45 and pxcor != -45 and pycor != 40]) [distance myself]
+    if (pycor < 6 or pxcor = 45 or pxcor = -45 or pycor = 40) [
+      setxyz random-pxcor random-pycor random-pzcor
+      ifelse pxcor >= 0
+      [lt random 90]
+      [rt random 90]
+      ;setxy [pxcor] of self [pycor] of self + 1
+      ;move-to one-of patches with [ ([pxcor] of self) and ([pycor] of self >= 6) ]
+    ]
+    wiggle
+    fd 0.5
+    move-to-parasite
+    catch-beetle
+    catch-larvae
+    if bee-life = 0 [ die ]
+    ;bounce
+  ]
+
+  ask guards
+  [
+    let target-patch min-one-of (patches in-radius 10 with [pycor = 0]) [distance myself]
+    if pycor != 0 [
+      move-to target-patch
+      ifelse pxcor >= 0
+      [lt random 90]
+      [rt random 90]
+      ;setxy [pxcor] of self [pycor] of self + 1
+      ;move-to one-of patches with [ ([pxcor] of self) and ([pycor] of self >= 6) ]
+    ]
+    wiggle
+    fd 0.2
+    move-to-parasite-guard
+    catch-beetle-guard
+    if guard-life = 0 [ die ]
+    ;bounce
+  ]
+
+  ask cells
+  [ ;;set n count hex-neighbors with [color = white]
+    ;;if count turtles-here > 1 [
+    if count beetles-here > 0 [
+      if (cell-life > 0 and color != blue) [
+         set cell-life cell-life - 1
+         ask beetles-here [ set beetle-life beetle-life + 1 ]
+        ;;recolor-cells
+        set color scale-color gray cell-life 0 10
+      ]
+    ]
+    if beetles-here != nobody [
+      ask beetles-here [
+        if beetle-life = 21 [
+          ;;set pcolor blue
+          ask cells-here [
+            set color yellow
+            set cell-life 0
+          ]
+        ]
+      ]
+    ]
+    ;;if cell-life = 2 [ set color yellow ]
+  ]
+
+  ask honeys
+  [ ;;set n count hex-neighbors with [color = white]
+    ;;if count turtles-here > 1 [
+    if count beetles-here > 0 [
+      if honey-life > 2 [
+         set honey-life honey-life - 1
+         ask beetles-here [ set beetle-life beetle-life + 1 ]
+      ]
+    ]
+
+    ;;recolor-cells
+    set color scale-color orange honey-life 0 10
+    ;;if cell-life = 2 [ set color yellow ]
+  ]
+
+  if count bees < 100 [
+    create-bees random 1 [
+      set size 2         ;;
+      set color pink      ;;
+      setxyz random-xcor random-ycor random-zcor
+      set bee-life 20
+    ]
+  ]
+
+  if ticks mod 5 = 0 [
+    create-beetles random 2 [
+    ;;set attack 0
+    set size 1         ;;
+    set color green      ;;
+    set beetle-life 1
+    setxy random-between (-3) (3) 0
+    ]
+  ]
+
+;  if ticks mod 30 = 0 [
+;   create-beetles random 2 [
+;    ;;set attack 0
+;    set size 1         ;;
+;    set color green      ;;
+;    set beetle-life 1
+;    setxy -45 random-ycor
+;    ]
+;  ]
+
+;  if ticks mod 30 = 0 [
+;    create-beetles random 2 [
+;    ;;set attack 0
+;    set size 1         ;;
+;    set color green      ;;
+;    set beetle-life 1
+;    setxy 45 random-ycor
+;    ]
+;  ]
+;
+;  if ticks mod 45 = 0 [
+;    create-beetles random 2 [
+;    ;;set attack 0
+;    set size 1         ;;
+;    set color green      ;;
+;    set beetle-life 1
+;    setxy random-xcor 40
+;    ]
+;  ]
+
+  if count guards <= initial-guard-population [
+    create-guards random initial-guard-population [
+      set size 2         ;;
+      set color blue      ;;
+      setxy random-between (-3) (3) 0
+      set guard-life 20
+    ]
+  ]
+
+  tick
+end ;;of to go
+
+to setup-hex-grid
+  set-default-shape cells "hex"
+
+ ; ask patches with [(pxcor = min-pxcor or pycor = min-pycor or pxcor = max-pxcor or pycor = max-pycor or pzcor = max-pzcor or pzcor = min-pzcor  ) ] [set pcolor red ]
+
+  ask patches with [ pzcor <= 37 and pzcor >= 0 and pycor <= 5 and pycor >= 2 and pxcor <= 44 and pxcor >= -44] [ set pcolor red ]
+
+ ;  ask patches with [ pzcor <= 10 and pzcor >= 0 and pycor = min-pycor and pxcor <= 44 and pxcor >= -44] [ set pcolor red ] ;to avoid world wra
+
+ ; ask patches with [ pzcor <= 6 and pzcor >= 5 and pycor <= 5 and pycor >= 2 and pxcor <= 44 and pxcor >= -44] [ set pcolor red ]
+
+  ;ask patches with [ pzcor <= -5 and pzcor >= -6 and pycor <= 5 and pycor >= 2 and pxcor <= 44 and pxcor >= -44] [ set pcolor red ]
+
+
+  ask patches with [ pzcor <= 1 and pzcor >= 0 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+    ask patches with [ pzcor <= 5 and pzcor >= 4 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+    ask patches with [ pzcor <= 9 and pzcor >= 8 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+  ask patches with [ pzcor <= 13 and pzcor >= 12 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+    ask patches with [ pzcor <= 17 and pzcor >= 16 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+    ask patches with [ pzcor <= 21 and pzcor >= 20 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+  ask patches with [ pzcor <= 25 and pzcor >= 24 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+    ask patches with [ pzcor <= 29 and pzcor >= 28 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+    ask patches with [ pzcor <= 33 and pzcor >= 32 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+  ask patches with [ pzcor <= 37 and pzcor >= 36 and (pxcor > -42 and pxcor < 42) and (pycor > 8 and pycor < 37) ]
+    [ sprout-cells 1
+        [ set cell-life random 20
+          set color scale-color gray cell-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+  set-default-shape honeys "hex"
+
+  ;ask patches with [ (((pxcor >= -44 and pxcor <= -42) or (pxcor >= 42 and pxcor <= 44)) and pycor > 5) or ((pycor > 5 and pycor <= 8) or (pycor >= 37 and pycor <= 39)) ]
+  ask patches with [ ( pzcor <= 1 and pzcor >= 0 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 1 and pzcor >= 0 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 1 and pzcor >= 0 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 1 and pzcor >= 0 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+    ask patches with [ ( pzcor <= 5 and pzcor >= 4 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 5 and pzcor >= 4 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 5 and pzcor >= 4 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 5 and pzcor >= 4 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+    ask patches with [ ( pzcor <= 9 and pzcor >= 8 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 9 and pzcor >= 8 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 9 and pzcor >= 8 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 9 and pzcor >= 8 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+
+    ask patches with [ ( pzcor <= 13 and pzcor >= 12 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 13 and pzcor >= 12 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 13 and pzcor >= 12 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 13 and pzcor >= 12 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+      ask patches with [ ( pzcor <= 17 and pzcor >= 16 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 17 and pzcor >= 16 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 17 and pzcor >= 16 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 17 and pzcor >= 16 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+    ask patches with [ ( pzcor <= 21 and pzcor >= 20 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 21 and pzcor >= 20 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 21 and pzcor >= 20 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 21 and pzcor >= 20 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+
+    ask patches with [ ( pzcor <= 25 and pzcor >= 24 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 25 and pzcor >= 24 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 25 and pzcor >= 24 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 25 and pzcor >= 24 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+      ask patches with [ ( pzcor <= 29 and pzcor >= 28 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 29 and pzcor >= 28 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 29 and pzcor >= 28 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 29 and pzcor >= 28 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+    ask patches with [ ( pzcor <= 33 and pzcor >= 32 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 33 and pzcor >= 32 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 33 and pzcor >= 32 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 33 and pzcor >= 32 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+
+
+    ask patches with [ ( pzcor <= 37 and pzcor >= 36 and (pxcor >= -44 and pxcor <= -42) and (pycor > 5 and pycor <= 39)) or ( pzcor <= 37 and pzcor >= 36 and (pxcor >= 42 and pxcor <= 44) and (pycor > 5 and pycor <= 39))
+    or ( pzcor <= 37 and pzcor >= 36 and (pxcor >= -44 and pxcor <= 44) and (pycor > 5 and pycor <= 8)) or ( pzcor <= 37 and pzcor >= 36 and (pxcor >= -44 and pxcor <= 44) and (pycor >= 37 and pycor <= 39))]
+    [ sprout-honeys 1
+        [ set honey-life random 20
+          set color scale-color orange honey-life 0 10
+          ;;set color gray ;; dark gray
+          ;; shift even columns down
+          if pxcor mod 2 = 0
+            [ set ycor ycor - 0.5 ] ] ]
+
+  ;; now set up the hex-neighbors agentsets
+  ask cells
+    [ ifelse pxcor mod 2 = 0
+        [ set hex-neighbors cells-on patches at-points [[0 1] [1 0] [1 -1] [0 -1] [-1 -1] [-1 0]] ]
+        [ set hex-neighbors cells-on patches at-points [[0 1] [1 1] [1  0] [0 -1] [-1  0] [-1 1]] ]
+    ]
+
+  ask honeys
+    [ ifelse pxcor mod 2 = 0
+        [ set hex-neighbors honeys-on patches at-points [[0 1] [1 0] [1 -1] [0 -1] [-1 -1] [-1 0]] ]
+        [ set hex-neighbors honeys-on patches at-points [[0 1] [1 1] [1  0] [0 -1] [-1  0] [-1 1]] ]
+    ]
+end ;;of setup-hex-grid
+
+
+
+to recolor-cells  ;;recolor cells into three colors
+
+  ifelse cell-life > 5
+  [
+     set color gray - 3
+  ]
+  [
+     ifelse cell-life > 0
+     [
+       set color gray - 5
+     ]
+     [
+       set color black
+     ]
+  ]
+end
+
+to wiggle  ;; turtle procedure from ant model library
+  rt random 20
+  lt random 20
+  if not can-move? 1 [ rt 180 ]
+end
+
+;to find-neighbor  ;; turtle procedure
+;  set neighbor other turtles in-radius vision
+;end
+
+;to find-nearest-neighbor ;; turtle procedure
+;  set nearest-neighbor min-one-of neighbor [distance myself]
+;end
+
+;to turn-towards [new-heading max-turn]  ;; turtle procedure
+;  turn-at-most (subtract-headings new-heading heading) max-turn
+;end
+
+to move-to-parasite
+  set nearest-parasite one-of (turtle-set beetles larvae) in-radius vision-bees
+  if nearest-parasite != nobody [
+    face nearest-parasite
+    ;if turtles-here != nearest-neighbor [ fd 0.5 ]
+    ifelse distance nearest-parasite > 0.2
+    [ fd 0.2 ]
+    [move-to nearest-parasite]
+  ]
+end
+
+to move-to-parasite-guard
+  set nearest-parasite-guards one-of (turtle-set beetles larvae) in-radius vision-guards
+  if nearest-parasite-guards != nobody [
+    face nearest-parasite-guards
+    ;if turtles-here != nearest-neighbor [ fd 0.5 ]
+    ifelse distance nearest-parasite-guards > 0.2
+    [ fd 0.2 ]
+    [move-to nearest-parasite-guards]
+  ]
+end
+
+to catch-beetle
+  let parasite one-of beetles-here
+  if parasite != nobody [
+    set bee-life bee-life - 1
+  ]
+end
+
+to catch-beetle-guard
+  let parasite one-of beetles-here
+  if parasite != nobody [
+    set guard-life guard-life - 1
+  ]
+end
+
+to reduce-beetle-life
+  let enemy one-of bees-here
+  let enemy2 one-of guards-here
+  if enemy != nobody [
+    ;;set attack attack + 1
+    ;;if attack = 2 [
+;    move-to patch [pxcor pycor, pzcor] of self 0
+    ;;]
+;    set beetle-life beetle-life - 10
+  ]
+  if enemy2 != nobody [
+    set beetle-life beetle-life - 1
+  ]
+end
+
+to reduce-larva-life
+  let enemy one-of bees-here
+  if enemy != nobody [
+    set larva-life larva-life - 1
+  ]
+end
+
+to catch-larvae
+  let parasite one-of larvae-here
+  if parasite != nobody [
+    set bee-life bee-life - 1
+  ]
+end
+
+to move-to-food
+  set target one-of cells in-radius vision-beetles with [cell-life > 0]
+  ifelse target != nobody [
+    face target
+    if (cells-here != target) [
+      ask beetles-here [ fd 0.5 ]
+      ask larvae-here [ fd 0.02 ]
+    ]
+    ask cells-here [
+      if cell-life = 0 [
+        ask beetles-here [
+          fd 0.5
+      ]
+        ask larvae-here [
+          fd 0.02
+        ]
+      ]
+  ]
+  ]
+  [ ask beetles-here [
+    wiggle
+    fd 0.5
+      ]
+  ask larvae-here [
+    wiggle
+    fd 0.02
+        ]
+  ]
+end
+
+to evade-bee
+  set nearest-bee one-of (turtle-set bees guards) in-radius vision-beetles
+  if nearest-bee != nobody [
+    face nearest-bee
+    rt 180
+    ;;if distance nearest-bee < 0.2
+    ;;[ fd -0.2 ]
+    ;;[ move-to nearest-parasite ]
+  ]
+end
+
+;; turn right by "turn" degrees (or left if "turn" is negative),
+;; but never turn more than "max-turn" degrees
+to turn-at-most [turn max-turn]  ;; turtle procedure
+  ifelse abs turn > max-turn
+    [ ifelse turn > 0
+        [ rt max-turn ]
+        [ lt max-turn ] ]
+    [ rt turn ]
+end
+
+to-report random-between [ min-num max-num ]
+  report random-float ( max-num - min-num ) + min-num
+end
+
+to bounce-beetles ;for turtles to not stay on the edge
+
+   if (pxcor = min-pxcor or pycor <= 1 or pxcor = max-pxcor or pycor >= max-pycor or pzcor = max-pzcor or pzcor = min-pzcor  )
+   ; if (pcolor = black)
+  [       move-to one-of patches with [(pxcor > -3 and pxcor < 3  and pycor < 2.5 and pycor > 0.5 and pzcor = 1)
+  ]]
+
+
+end
+
+; try 7 frames, then 5 if hindi
+@#$#@#$#@
+GRAPHICS-WINDOW
+0
+0
+1191
+542
+-1
+-1
+13.0
+1
+10
+1
+1
+1
+0
+1
+1
+1
+-45
+45
+0
+40
+0
+38
+1
+0
+1
+ticks
+10.0
+
+BUTTON
+28
+13
+91
+46
+NIL
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+94
+13
+157
+46
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+159
+14
+222
+47
+step
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SLIDER
+27
+66
+206
+99
+initial-beetle-population
+initial-beetle-population
+5
+100
+100.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+26
+103
+206
+136
+initial-bee-population
+initial-bee-population
+10000
+60000
+30000.0
+10000
+1
+NIL
+HORIZONTAL
+
+SLIDER
+25
+140
+208
+173
+initial-guard-population
+initial-guard-population
+0
+20
+20.0
+4
+1
+NIL
+HORIZONTAL
+
+SLIDER
+25
+218
+197
+251
+vision-bees
+vision-bees
+0
+50
+10.0
+10
+1
+NIL
+HORIZONTAL
+
+SLIDER
+25
+255
+197
+288
+vision-guards
+vision-guards
+0
+10
+8.0
+2
+1
+NIL
+HORIZONTAL
+
+SLIDER
+24
+293
+196
+326
+vision-beetles
+vision-beetles
+0
+10
+4.0
+2
+1
+NIL
+HORIZONTAL
+
+PLOT
+227
+65
+656
+329
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"beetles" 1.0 0 -5298144 true "" "plot count beetles"
+"bees" 1.0 0 -1184463 true "" "plot count bees"
+"larves" 1.0 0 -4699768 true "" "plot count larvae"
+"guards" 1.0 0 -14730904 true "" "plot count guards"
+
+MONITOR
+238
+11
+294
+56
+Cells
+count cells with [ cell-life > 0]
+17
+1
+11
+
+MONITOR
+302
+11
+359
+56
+beetles
+count beetles
+17
+1
+11
+
+MONITOR
+365
+11
+423
+56
+Bees
+count bees with [ bee-life > 0 ]
+17
+1
+11
+
+MONITOR
+430
+12
+488
+57
+Guards
+count guards with [ guard-life > 0 ]
+17
+1
+11
+
+@#$#@#$#@
+## WHAT IS IT?
+
+(a general understanding of what the model is trying to show or explain)
+
+## HOW IT WORKS
+
+(what rules the agents use to create the overall behavior of the model)
+
+## HOW TO USE IT
+
+(how to use the model, including a description of each of the items in the Interface tab)
+
+## THINGS TO NOTICE
+
+(suggested things for the user to notice while running the model)
+
+## THINGS TO TRY
+
+(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+
+## EXTENDING THE MODEL
+
+(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+
+## NETLOGO FEATURES
+
+(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+
+## RELATED MODELS
+
+(models in the NetLogo Models Library and elsewhere which are of related interest)
+
+## CREDITS AND REFERENCES
+
+(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+@#$#@#$#@
+default
+true
+0
+Polygon -7500403 true true 150 5 40 250 150 205 260 250
+
+airplane
+true
+0
+Polygon -7500403 true true 150 0 135 15 120 60 120 105 15 165 15 195 120 180 135 240 105 270 120 285 150 270 180 285 210 270 165 240 180 180 285 195 285 165 180 105 180 60 165 15
+
+arrow
+true
+0
+Polygon -7500403 true true 150 0 0 150 105 150 105 293 195 293 195 150 300 150
+
+bee
+true
+0
+Polygon -1184463 true false 152 149 77 163 67 195 67 211 74 234 85 252 100 264 116 276 134 286 151 300 167 285 182 278 206 260 220 242 226 218 226 195 222 166
+Polygon -16777216 true false 150 149 128 151 114 151 98 145 80 122 80 103 81 83 95 67 117 58 141 54 151 53 177 55 195 66 207 82 211 94 211 116 204 139 189 149 171 152
+Polygon -7500403 true true 151 54 119 59 96 60 81 50 78 39 87 25 103 18 115 23 121 13 150 1 180 14 189 23 197 17 210 19 222 30 222 44 212 57 192 58
+Polygon -16777216 true false 70 185 74 171 223 172 224 186
+Polygon -16777216 true false 67 211 71 226 224 226 225 211 67 211
+Polygon -16777216 true false 91 257 106 269 195 269 211 255
+Line -1 false 144 100 70 87
+Line -1 false 70 87 45 87
+Line -1 false 45 86 26 97
+Line -1 false 26 96 22 115
+Line -1 false 22 115 25 130
+Line -1 false 26 131 37 141
+Line -1 false 37 141 55 144
+Line -1 false 55 143 143 101
+Line -1 false 141 100 227 138
+Line -1 false 227 138 241 137
+Line -1 false 241 137 249 129
+Line -1 false 249 129 254 110
+Line -1 false 253 108 248 97
+Line -1 false 249 95 235 82
+Line -1 false 235 82 144 100
+
+box
+false
+0
+Polygon -7500403 true true 150 285 285 225 285 75 150 135
+Polygon -7500403 true true 150 135 15 75 150 15 285 75
+Polygon -7500403 true true 15 75 15 225 150 285 150 135
+Line -16777216 false 150 285 150 135
+Line -16777216 false 150 135 15 75
+Line -16777216 false 150 135 285 75
+
+bug
+true
+0
+Circle -7500403 true true 96 182 108
+Circle -7500403 true true 110 127 80
+Circle -7500403 true true 110 75 80
+Line -7500403 true 150 100 80 30
+Line -7500403 true 150 100 220 30
+
+butterfly
+true
+0
+Polygon -7500403 true true 150 165 209 199 225 225 225 255 195 270 165 255 150 240
+Polygon -7500403 true true 150 165 89 198 75 225 75 255 105 270 135 255 150 240
+Polygon -7500403 true true 139 148 100 105 55 90 25 90 10 105 10 135 25 180 40 195 85 194 139 163
+Polygon -7500403 true true 162 150 200 105 245 90 275 90 290 105 290 135 275 180 260 195 215 195 162 165
+Polygon -16777216 true false 150 255 135 225 120 150 135 120 150 105 165 120 180 150 165 225
+Circle -16777216 true false 135 90 30
+Line -16777216 false 150 105 195 60
+Line -16777216 false 150 105 105 60
+
+car
+false
+0
+Polygon -7500403 true true 300 180 279 164 261 144 240 135 226 132 213 106 203 84 185 63 159 50 135 50 75 60 0 150 0 165 0 225 300 225 300 180
+Circle -16777216 true false 180 180 90
+Circle -16777216 true false 30 180 90
+Polygon -16777216 true false 162 80 132 78 134 135 209 135 194 105 189 96 180 89
+Circle -7500403 true true 47 195 58
+Circle -7500403 true true 195 195 58
+
+caterpillar
+true
+0
+Polygon -7500403 true true 165 210 165 225 135 255 105 270 90 270 75 255 75 240 90 210 120 195 135 165 165 135 165 105 150 75 150 60 135 60 120 45 120 30 135 15 150 15 180 30 180 45 195 45 210 60 225 105 225 135 210 150 210 165 195 195 180 210
+Line -16777216 false 135 255 90 210
+Line -16777216 false 165 225 120 195
+Line -16777216 false 135 165 180 210
+Line -16777216 false 150 150 201 186
+Line -16777216 false 165 135 210 150
+Line -16777216 false 165 120 225 120
+Line -16777216 false 165 106 221 90
+Line -16777216 false 157 91 210 60
+Line -16777216 false 150 60 180 45
+Line -16777216 false 120 30 96 26
+Line -16777216 false 124 0 135 15
+
+circle
+false
+0
+Circle -7500403 true true 0 0 300
+
+circle 2
+false
+0
+Circle -7500403 true true 0 0 300
+Circle -16777216 true false 30 30 240
+
+cow
+false
+0
+Polygon -7500403 true true 200 193 197 249 179 249 177 196 166 187 140 189 93 191 78 179 72 211 49 209 48 181 37 149 25 120 25 89 45 72 103 84 179 75 198 76 252 64 272 81 293 103 285 121 255 121 242 118 224 167
+Polygon -7500403 true true 73 210 86 251 62 249 48 208
+Polygon -7500403 true true 25 114 16 195 9 204 23 213 25 200 39 123
+
+cylinder
+false
+0
+Circle -7500403 true true 0 0 300
+
+dot
+false
+0
+Circle -7500403 true true 90 90 120
+
+face happy
+false
+0
+Circle -7500403 true true 8 8 285
+Circle -16777216 true false 60 75 60
+Circle -16777216 true false 180 75 60
+Polygon -16777216 true false 150 255 90 239 62 213 47 191 67 179 90 203 109 218 150 225 192 218 210 203 227 181 251 194 236 217 212 240
+
+face neutral
+false
+0
+Circle -7500403 true true 8 7 285
+Circle -16777216 true false 60 75 60
+Circle -16777216 true false 180 75 60
+Rectangle -16777216 true false 60 195 240 225
+
+face sad
+false
+0
+Circle -7500403 true true 8 8 285
+Circle -16777216 true false 60 75 60
+Circle -16777216 true false 180 75 60
+Polygon -16777216 true false 150 168 90 184 62 210 47 232 67 244 90 220 109 205 150 198 192 205 210 220 227 242 251 229 236 206 212 183
+
+fish
+false
+0
+Polygon -1 true false 44 131 21 87 15 86 0 120 15 150 0 180 13 214 20 212 45 166
+Polygon -1 true false 135 195 119 235 95 218 76 210 46 204 60 165
+Polygon -1 true false 75 45 83 77 71 103 86 114 166 78 135 60
+Polygon -7500403 true true 30 136 151 77 226 81 280 119 292 146 292 160 287 170 270 195 195 210 151 212 30 166
+Circle -16777216 true false 215 106 30
+
+flag
+false
+0
+Rectangle -7500403 true true 60 15 75 300
+Polygon -7500403 true true 90 150 270 90 90 30
+Line -7500403 true 75 135 90 135
+Line -7500403 true 75 45 90 45
+
+flower
+false
+0
+Polygon -10899396 true false 135 120 165 165 180 210 180 240 150 300 165 300 195 240 195 195 165 135
+Circle -7500403 true true 85 132 38
+Circle -7500403 true true 130 147 38
+Circle -7500403 true true 192 85 38
+Circle -7500403 true true 85 40 38
+Circle -7500403 true true 177 40 38
+Circle -7500403 true true 177 132 38
+Circle -7500403 true true 70 85 38
+Circle -7500403 true true 130 25 38
+Circle -7500403 true true 96 51 108
+Circle -16777216 true false 113 68 74
+Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
+Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
+
+hex
+false
+0
+Polygon -7500403 true true 0 150 75 30 225 30 300 150 225 270 75 270
+
+house
+false
+0
+Rectangle -7500403 true true 45 120 255 285
+Rectangle -16777216 true false 120 210 180 285
+Polygon -7500403 true true 15 120 150 15 285 120
+Line -16777216 false 30 120 270 120
+
+leaf
+false
+0
+Polygon -7500403 true true 150 210 135 195 120 210 60 210 30 195 60 180 60 165 15 135 30 120 15 105 40 104 45 90 60 90 90 105 105 120 120 120 105 60 120 60 135 30 150 15 165 30 180 60 195 60 180 120 195 120 210 105 240 90 255 90 263 104 285 105 270 120 285 135 240 165 240 180 270 195 240 210 180 210 165 195
+Polygon -7500403 true true 135 195 135 240 120 255 105 255 105 285 135 285 165 240 165 195
+
+line
+true
+0
+Line -7500403 true 150 0 150 300
+
+line half
+true
+0
+Line -7500403 true 150 0 150 150
+
+pentagon
+false
+0
+Polygon -7500403 true true 150 15 15 120 60 285 240 285 285 120
+
+person
+false
+0
+Circle -7500403 true true 110 5 80
+Polygon -7500403 true true 105 90 120 195 90 285 105 300 135 300 150 225 165 300 195 300 210 285 180 195 195 90
+Rectangle -7500403 true true 127 79 172 94
+Polygon -7500403 true true 195 90 240 150 225 180 165 105
+Polygon -7500403 true true 105 90 60 150 75 180 135 105
+
+plant
+false
+0
+Rectangle -7500403 true true 135 90 165 300
+Polygon -7500403 true true 135 255 90 210 45 195 75 255 135 285
+Polygon -7500403 true true 165 255 210 210 255 195 225 255 165 285
+Polygon -7500403 true true 135 180 90 135 45 120 75 180 135 210
+Polygon -7500403 true true 165 180 165 210 225 180 255 120 210 135
+Polygon -7500403 true true 135 105 90 60 45 45 75 105 135 135
+Polygon -7500403 true true 165 105 165 135 225 105 255 45 210 60
+Polygon -7500403 true true 135 90 120 45 150 15 180 45 165 90
+
+sheep
+false
+15
+Circle -1 true true 203 65 88
+Circle -1 true true 70 65 162
+Circle -1 true true 150 105 120
+Polygon -7500403 true false 218 120 240 165 255 165 278 120
+Circle -7500403 true false 214 72 67
+Rectangle -1 true true 164 223 179 298
+Polygon -1 true true 45 285 30 285 30 240 15 195 45 210
+Circle -1 true true 3 83 150
+Rectangle -1 true true 65 221 80 296
+Polygon -1 true true 195 285 210 285 210 240 240 210 195 210
+Polygon -7500403 true false 276 85 285 105 302 99 294 83
+Polygon -7500403 true false 219 85 210 105 193 99 201 83
+
+square
+false
+0
+Rectangle -7500403 true true 30 30 270 270
+
+square 2
+false
+0
+Rectangle -7500403 true true 30 30 270 270
+Rectangle -16777216 true false 60 60 240 240
+
+star
+false
+0
+Polygon -7500403 true true 151 1 185 108 298 108 207 175 242 282 151 216 59 282 94 175 3 108 116 108
+
+target
+false
+0
+Circle -7500403 true true 0 0 300
+Circle -16777216 true false 30 30 240
+Circle -7500403 true true 60 60 180
+Circle -16777216 true false 90 90 120
+Circle -7500403 true true 120 120 60
+
+tree
+false
+0
+Circle -7500403 true true 118 3 94
+Rectangle -6459832 true false 120 195 180 300
+Circle -7500403 true true 65 21 108
+Circle -7500403 true true 116 41 127
+Circle -7500403 true true 45 90 120
+Circle -7500403 true true 104 74 152
+
+triangle
+false
+0
+Polygon -7500403 true true 150 30 15 255 285 255
+
+triangle 2
+false
+0
+Polygon -7500403 true true 150 30 15 255 285 255
+Polygon -16777216 true false 151 99 225 223 75 224
+
+truck
+false
+0
+Rectangle -7500403 true true 4 45 195 187
+Polygon -7500403 true true 296 193 296 150 259 134 244 104 208 104 207 194
+Rectangle -1 true false 195 60 195 105
+Polygon -16777216 true false 238 112 252 141 219 141 218 112
+Circle -16777216 true false 234 174 42
+Rectangle -7500403 true true 181 185 214 194
+Circle -16777216 true false 144 174 42
+Circle -16777216 true false 24 174 42
+Circle -7500403 false true 24 174 42
+Circle -7500403 false true 144 174 42
+Circle -7500403 false true 234 174 42
+
+turtle
+true
+0
+Polygon -10899396 true false 215 204 240 233 246 254 228 266 215 252 193 210
+Polygon -10899396 true false 195 90 225 75 245 75 260 89 269 108 261 124 240 105 225 105 210 105
+Polygon -10899396 true false 105 90 75 75 55 75 40 89 31 108 39 124 60 105 75 105 90 105
+Polygon -10899396 true false 132 85 134 64 107 51 108 17 150 2 192 18 192 52 169 65 172 87
+Polygon -10899396 true false 85 204 60 233 54 254 72 266 85 252 107 210
+Polygon -7500403 true true 119 75 179 75 209 101 224 135 220 225 175 261 128 261 81 224 74 135 88 99
+
+wheel
+false
+0
+Circle -7500403 true true 3 3 294
+Circle -16777216 true false 30 30 240
+Line -7500403 true 150 285 150 15
+Line -7500403 true 15 150 285 150
+Circle -7500403 true true 120 120 60
+Line -7500403 true 216 40 79 269
+Line -7500403 true 40 84 269 221
+Line -7500403 true 40 216 269 79
+Line -7500403 true 84 40 221 269
+
+wolf
+false
+0
+Polygon -16777216 true false 253 133 245 131 245 133
+Polygon -7500403 true true 2 194 13 197 30 191 38 193 38 205 20 226 20 257 27 265 38 266 40 260 31 253 31 230 60 206 68 198 75 209 66 228 65 243 82 261 84 268 100 267 103 261 77 239 79 231 100 207 98 196 119 201 143 202 160 195 166 210 172 213 173 238 167 251 160 248 154 265 169 264 178 247 186 240 198 260 200 271 217 271 219 262 207 258 195 230 192 198 210 184 227 164 242 144 259 145 284 151 277 141 293 140 299 134 297 127 273 119 270 105
+Polygon -7500403 true true -1 195 14 180 36 166 40 153 53 140 82 131 134 133 159 126 188 115 227 108 236 102 238 98 268 86 269 92 281 87 269 103 269 113
+
+x
+false
+0
+Polygon -7500403 true true 270 75 225 30 30 225 75 270
+Polygon -7500403 true true 30 75 75 30 270 225 225 270
+@#$#@#$#@
+NetLogo 3D 6.2.0
+@#$#@#$#@
+need-to-manually-make-preview-for-this-model
+@#$#@#$#@
+@#$#@#$#@
+<experiments>
+  <experiment name="Initial Simulation" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="30000"/>
+    <metric>ticks</metric>
+    <enumeratedValueSet variable="initial-bee-population">
+      <value value="30000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vision-guards">
+      <value value="8"/>
+    </enumeratedValueSet>
+    <steppedValueSet variable="initial-beetle-population" first="10" step="10" last="100"/>
+    <steppedValueSet variable="initial-guard-population" first="0" step="4" last="20"/>
+    <enumeratedValueSet variable="vision-bees">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="vision-beetles">
+      <value value="4"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
+@#$#@#$#@
+@#$#@#$#@
+default
+0.0
+-0.2 0 0.0 1.0
+0.0 1 1.0 0.0
+0.2 0 0.0 1.0
+link direction
+true
+0
+Line -7500403 true 150 150 90 180
+Line -7500403 true 150 150 210 180
+@#$#@#$#@
+0
+@#$#@#$#@
